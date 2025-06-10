@@ -1,4 +1,4 @@
-package badgerqueue
+package queue
 
 import (
 	"errors"
@@ -51,9 +51,8 @@ func (qd *QueueDisk) Close() error {
 	return qd.db.Close()
 }
 
-// Enqueue: key = counter (no value), value = queueName + ":::" + payload
 func (qd *QueueDisk) Enqueue(value string) error {
-	key := []byte(fmt.Sprintf("%d", qd.counter))
+	key := []byte(fmt.Sprintf("%020d", qd.counter))
 	qd.counter++
 
 	return qd.db.Update(func(txn *badger.Txn) error {
