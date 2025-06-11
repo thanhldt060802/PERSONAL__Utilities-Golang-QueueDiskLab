@@ -1,4 +1,4 @@
-package badgerqueue
+package queue
 
 import (
 	"errors"
@@ -12,9 +12,16 @@ import (
 type BatchQueueDisk struct {
 	db      *badger.DB
 	counter int64
+
+	batchSize int
+
+	batchEnqueue            []string
+	currentBatchEnqueueSize int
+
+	batchDequeue []string
 }
 
-func NewBatchQueueDisk(path string) *BatchQueueDisk {
+func NewBatchQueueDisk(path string, batchSize int) *BatchQueueDisk {
 	opts := badger.DefaultOptions(path)
 	// opts.WithSyncWrites(true)
 	opts.Logger = nil
@@ -26,6 +33,13 @@ func NewBatchQueueDisk(path string) *BatchQueueDisk {
 	bqd := &BatchQueueDisk{
 		db:      db,
 		counter: 0,
+
+		batchSize: batchSize,
+
+		batchEnqueue:            make([]string, batchSize),
+		currentBatchEnqueueSize: 0,
+
+		batchDequeue: make([]string, batchSize),
 	}
 	go bqd.GarbageCollection()
 
@@ -51,34 +65,40 @@ func (bqd *BatchQueueDisk) Close() error {
 	return bqd.db.Close()
 }
 
-// Enqueue: key = counter (no value), value = queueName + ":::" + payload
-func (bqd *BatchQueueDisk) Enqueue(values []string) error {
-	return bqd.db.Update(func(txn *badger.Txn) error {
-		for _, value := range values {
-			time.Sleep(10 * time.Millisecond)
-			key := []byte(fmt.Sprintf("%d", bqd.counter))
-			bqd.counter++
+func (bqd *BatchQueueDisk) Enqueue(value string) error {
+	bqd.batchEnqueue[bqd.currentBatchEnqueueSize] = value
+	bqd.currentBatchEnqueueSize++
 
-			if err := txn.Set(key, []byte(value)); err != nil {
-				return err
+	if bqd.currentBatchEnqueueSize >= bqd.batchSize {
+		return bqd.db.Update(func(txn *badger.Txn) error {
+			for _, value := range bqd.batchEnqueue {
+				key := []byte(fmt.Sprintf("%020d", bqd.counter))
+				bqd.counter++
+
+				if err := txn.Set(key, []byte(value)); err != nil {
+					return err
+				}
 			}
-		}
 
-		return nil
-	})
+			bqd.currentBatchEnqueueSize = 0
+
+			return nil
+		})
+	}
+
+	return nil
 }
 
-// Dequeue: lấy 1 item đầu tiên bất kỳ
-func (bqd *BatchQueueDisk) Dequeue(batchSize int) ([]string, error) {
-	keysToDelete := [][]byte{}
-	values := []string{}
+func (bqd *BatchQueueDisk) Dequeue() ([]string, error) {
+	var keysToDelete [][]byte
+	var values []string
 
 	err := bqd.db.Update(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
 
-		currentSize := 0
-		for it.Rewind(); it.Valid() && currentSize < batchSize; it.Next() {
+		currentBatchDequeueSize := 0
+		for it.Rewind(); it.Valid() && currentBatchDequeueSize < bqd.batchSize; it.Next() {
 			item := it.Item()
 			k := item.KeyCopy(nil)
 			v, err := item.ValueCopy(nil)
@@ -86,11 +106,12 @@ func (bqd *BatchQueueDisk) Dequeue(batchSize int) ([]string, error) {
 				return err
 			}
 
-			values = append(values, string(v))
+			bqd.batchDequeue[currentBatchDequeueSize] = string(v)
 			keysToDelete = append(keysToDelete, k)
 
-			currentSize++
+			currentBatchDequeueSize++
 		}
+		values = bqd.batchDequeue[:currentBatchDequeueSize]
 
 		if len(values) == 0 {
 			return errors.New("queue empty")

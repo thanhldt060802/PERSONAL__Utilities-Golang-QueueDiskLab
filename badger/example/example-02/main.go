@@ -7,11 +7,11 @@ import (
 	"time"
 )
 
-var QueueDiskInstance *queue.QueueDisk
+var BatchQueueDiskInstance *queue.BatchQueueDisk
 
 func main() {
 
-	QueueDiskInstance = queue.NewQueueDisk("disk_storage")
+	BatchQueueDiskInstance = queue.NewBatchQueueDisk("disk_storage", 100)
 
 	// data := make([]string, 10000)
 	// for i := 0; i < len(data); i++ {
@@ -21,7 +21,7 @@ func main() {
 
 	DequeueDemo()
 
-	QueueDiskInstance.Close()
+	BatchQueueDiskInstance.Close()
 
 }
 
@@ -29,7 +29,7 @@ func EnqueueDemo(data []string) {
 	count := 0
 	startTime := time.Now()
 	for _, element := range data {
-		if err := QueueDiskInstance.Enqueue(element); err != nil {
+		if err := BatchQueueDiskInstance.Enqueue(element); err != nil {
 			log.Fatal(err.Error())
 		}
 		count++
@@ -42,12 +42,14 @@ func DequeueDemo() {
 	count := 0
 	startTime := time.Now()
 	for {
-		value, err := QueueDiskInstance.Dequeue()
+		values, err := BatchQueueDiskInstance.Dequeue()
 		if err != nil {
 			break
 		}
-		fmt.Println(value)
-		count++
+		for _, value := range values {
+			fmt.Println(value)
+		}
+		count += len(values)
 	}
 	endTime := time.Now()
 	log.Printf("Total time for dequeue %v elements: %v\n", count, endTime.Sub(startTime))

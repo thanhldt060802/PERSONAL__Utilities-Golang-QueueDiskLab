@@ -60,7 +60,6 @@ func (qd *QueueDisk) Enqueue(value string) error {
 	})
 }
 
-// Dequeue: lấy 1 item đầu tiên bất kỳ
 func (qd *QueueDisk) Dequeue() (string, error) {
 	var keyToDelete []byte
 	var value string
