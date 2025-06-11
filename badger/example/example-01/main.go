@@ -13,13 +13,13 @@ func main() {
 
 	QueueDiskInstance = queue.NewQueueDisk("disk_storage")
 
-	// data := make([]string, 10000)
-	// for i := 0; i < len(data); i++ {
-	// 	data[i] = fmt.Sprintf("message %v", i)
-	// }
-	// EnqueueDemo(data)
+	data := make([]string, 10000)
+	for i := 0; i < len(data); i++ {
+		data[i] = fmt.Sprintf("message %v", i)
+	}
+	EnqueueDemo(data)
 
-	DequeueDemo()
+	DequeueDemo(false)
 
 	QueueDiskInstance.Close()
 
@@ -38,16 +38,26 @@ func EnqueueDemo(data []string) {
 	log.Printf("Total time for enqueue %v elements: %v\n", count, endTime.Sub(startTime))
 }
 
-func DequeueDemo() {
+func DequeueDemo(printable bool) {
 	count := 0
 	startTime := time.Now()
-	for {
-		value, err := QueueDiskInstance.Dequeue()
-		if err != nil {
-			break
+	if printable {
+		for {
+			value, err := QueueDiskInstance.Dequeue()
+			if err != nil {
+				break
+			}
+			fmt.Println(value)
+			count++
 		}
-		fmt.Println(value)
-		count++
+	} else {
+		for {
+			_, err := QueueDiskInstance.Dequeue()
+			if err != nil {
+				break
+			}
+			count++
+		}
 	}
 	endTime := time.Now()
 	log.Printf("Total time for dequeue %v elements: %v\n", count, endTime.Sub(startTime))

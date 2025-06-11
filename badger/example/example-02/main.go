@@ -13,13 +13,13 @@ func main() {
 
 	BatchQueueDiskInstance = queue.NewBatchQueueDisk("disk_storage", 100)
 
-	// data := make([]string, 10000)
-	// for i := 0; i < len(data); i++ {
-	// 	data[i] = fmt.Sprintf("message %v", i)
-	// }
-	// EnqueueDemo(data)
+	data := make([]string, 10000)
+	for i := 0; i < len(data); i++ {
+		data[i] = fmt.Sprintf("message %v", i)
+	}
+	EnqueueDemo(data)
 
-	DequeueDemo()
+	DequeueDemo(false)
 
 	BatchQueueDiskInstance.Close()
 
@@ -38,18 +38,28 @@ func EnqueueDemo(data []string) {
 	log.Printf("Total time for enqueue %v elements: %v\n", count, endTime.Sub(startTime))
 }
 
-func DequeueDemo() {
+func DequeueDemo(printable bool) {
 	count := 0
 	startTime := time.Now()
-	for {
-		values, err := BatchQueueDiskInstance.Dequeue()
-		if err != nil {
-			break
+	if printable {
+		for {
+			values, err := BatchQueueDiskInstance.Dequeue()
+			if err != nil {
+				break
+			}
+			for _, value := range values {
+				fmt.Println(value)
+			}
+			count += len(values)
 		}
-		for _, value := range values {
-			fmt.Println(value)
+	} else {
+		for {
+			values, err := BatchQueueDiskInstance.Dequeue()
+			if err != nil {
+				break
+			}
+			count += len(values)
 		}
-		count += len(values)
 	}
 	endTime := time.Now()
 	log.Printf("Total time for dequeue %v elements: %v\n", count, endTime.Sub(startTime))
